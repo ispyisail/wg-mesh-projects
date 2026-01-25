@@ -1,0 +1,23 @@
+# Sample generated WireGuard configuration for testing
+[Interface]
+PrivateKey = SAMPLE_PRIVATE_KEY_BASE64_ENCODED_HERE==
+Address = 10.99.0.1/24
+ListenPort = 51820
+
+[Peer]
+# server2 - Backup server
+PublicKey = XYZ987wvu654TSR321qpo098NML765kji432HGF109ed==
+AllowedIPs = 10.99.0.2/32, 192.168.2.0/24
+Endpoint = server2.example.com:51820
+
+[Peer]
+# laptop1 - Work laptop
+PublicKey = DEF456ghi789JKL012mno345PQR678stu901VWX234yz==
+AllowedIPs = 10.99.0.10/32
+PersistentKeepalive = 25
+
+[Peer]
+# phone1 - Mobile phone
+PublicKey = GHI789jkl012MNO345pqr678STU901vwx234YZA567bc==
+AllowedIPs = 10.99.0.20/32
+PersistentKeepalive = 25

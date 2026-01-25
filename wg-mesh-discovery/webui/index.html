@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WireGuard Mesh Discovery</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>WireGuard Mesh Discovery</h1>
+            <p class="subtitle">Device Discovery Dashboard</p>
+        </header>
+
+        <nav class="actions">
+            <button id="btn-scan" class="btn btn-primary">Scan Now</button>
+            <button id="btn-refresh" class="btn">Refresh</button>
+            <button id="btn-export" class="btn">Export</button>
+        </nav>
+
+        <section class="stats">
+            <div class="stat-card">
+                <span class="stat-value" id="total-devices">0</span>
+                <span class="stat-label">Devices</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="total-printers">0</span>
+                <span class="stat-label">Printers</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="total-nas">0</span>
+                <span class="stat-label">NAS</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="total-other">0</span>
+                <span class="stat-label">Other</span>
+            </div>
+        </section>
+
+        <section class="filters">
+            <input type="text" id="search" placeholder="Search devices...">
+            <select id="type-filter">
+                <option value="">All Types</option>
+                <option value="printer">Printers</option>
+                <option value="nas">NAS</option>
+                <option value="camera">Cameras</option>
+                <option value="other">Other</option>
+            </select>
+        </section>
+
+        <section class="devices">
+            <table id="devices-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>MAC Address</th>
+                        <th>Vendor</th>
+                        <th>Type</th>
+                        <th>DNS Name</th>
+                        <th>Last Seen</th>
+                    </tr>
+                </thead>
+                <tbody id="devices-body">
+                    <tr>
+                        <td colspan="6" class="loading">Loading devices...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <footer>
+            <p>WireGuard Mesh Discovery v1.0.0</p>
+        </footer>
+    </div>
+
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modal-title">Device Details</h2>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

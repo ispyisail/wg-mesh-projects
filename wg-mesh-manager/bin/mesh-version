@@ -1,0 +1,86 @@
+#!/bin/sh
+# mesh-version - Show version information
+# Part of WireGuard Mesh Manager
+
+VERSION="1.0.0"
+
+usage() {
+    cat <<EOF
+Usage: mesh-version [OPTIONS]
+
+Show version information.
+
+Options:
+    -s, --short     Show only version number
+    --json          Output as JSON
+    -h, --help      Show this help message
+EOF
+}
+
+SHORT=0
+JSON=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -s|--short)
+            SHORT=1
+            shift
+            ;;
+        --json)
+            JSON=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Get WireGuard version
+WG_VERSION=$(wg --version 2>/dev/null | head -1 || echo "not installed")
+
+if [ "$SHORT" = "1" ]; then
+    echo "$VERSION"
+    exit 0
+fi
+
+if [ "$JSON" = "1" ]; then
+    cat <<EOF
+{
+  "mesh_manager": "$VERSION",
+  "wireguard": "$WG_VERSION"
+}
+EOF
+    exit 0
+fi
+
+cat <<EOF
+WireGuard Mesh Manager
+======================
+Version:    $VERSION
+WireGuard:  $WG_VERSION
+
+Project:    https://github.com/YOUR_USERNAME/wg-mesh-projects
+License:    MIT
+
+Commands:
+  mesh-init         Initialize mesh network
+  mesh-add          Add peer
+  mesh-remove       Remove peer
+  mesh-list         List peers
+  mesh-update       Update peer
+  mesh-generate     Generate configs
+  mesh-apply-local  Apply configuration
+  mesh-status       Show status
+  mesh-health       Health check
+  mesh-backup       Backup config
+  mesh-recover      Restore backup
+  mesh-stats        Show statistics
+
+Run 'mesh-<command> --help' for usage information.
+EOF

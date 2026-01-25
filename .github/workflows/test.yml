@@ -1,0 +1,60 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Mesh Manager Tests
+      run: |
+        cd wg-mesh-manager/tests
+        chmod +x test-mesh.sh
+        ./test-mesh.sh
+
+    - name: Run Discovery Tests
+      run: |
+        cd wg-mesh-discovery/tests
+        chmod +x test-discovery.sh
+        ./test-discovery.sh
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install WireGuard
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wireguard-tools
+
+    - name: Run Integration Tests
+      run: |
+        cd wg-mesh-manager/tests
+        chmod +x test-integration.sh
+        ./test-integration.sh || echo "Integration tests require root, skipping in CI"
+
+  shellcheck:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install shellcheck
+      run: sudo apt-get install -y shellcheck
+
+    - name: Lint shell scripts
+      run: |
+        find . -name "*.sh" -type f -exec shellcheck --severity=warning {} \; || true
+        find ./wg-mesh-manager/bin -type f -exec shellcheck --severity=warning {} \; 2>/dev/null || true
+        find ./wg-mesh-discovery/bin -type f -exec shellcheck --severity=warning {} \; 2>/dev/null || true

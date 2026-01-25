@@ -1,0 +1,136 @@
+#!/bin/sh
+# mesh-discovery-export - Export discovered devices
+# Part of WireGuard Mesh Discovery
+
+CONF_DIR="/etc/wg-mesh"
+DEVICES_DB="${CONF_DIR}/discovery/devices.db"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-export [OPTIONS]
+
+Export discovered devices to various formats.
+
+Options:
+    --format FORMAT   Output format: json, csv, hosts (default: json)
+    --output FILE     Write to file instead of stdout
+    --fields FIELDS   Fields to include (comma-separated)
+    -h, --help        Show this help message
+
+Fields: ip, mac, vendor, method, timestamp, hostname
+
+Examples:
+    mesh-discovery-export --format json > devices.json
+    mesh-discovery-export --format csv --output devices.csv
+    mesh-discovery-export --format hosts >> /etc/hosts
+EOF
+}
+
+FORMAT="json"
+OUTPUT=""
+FIELDS="ip,mac,vendor,method,timestamp"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --format)
+            FORMAT="$2"
+            shift 2
+            ;;
+        --output)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        --fields)
+            FIELDS="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+if [ ! -f "$DEVICES_DB" ] || [ ! -s "$DEVICES_DB" ]; then
+    case "$FORMAT" in
+        json) echo "[]" ;;
+        csv) echo "ip,mac,vendor,method,timestamp" ;;
+        *) ;;
+    esac
+    exit 0
+fi
+
+# Load config for DNS suffix
+if [ -f "${CONF_DIR}/discovery.conf" ]; then
+    . "${CONF_DIR}/discovery.conf"
+fi
+: "${DNS_SUFFIX:=.mesh}"
+
+export_json() {
+    echo "["
+    FIRST=1
+    while IFS='|' read -r ip mac vendor method timestamp; do
+        [ -z "$ip" ] && continue
+        [ "$FIRST" = "1" ] && FIRST=0 || echo ","
+        hostname=$(echo "$ip" | tr '.' '-')
+        cat <<EOF
+  {
+    "ip": "$ip",
+    "mac": "$mac",
+    "vendor": "$vendor",
+    "method": "$method",
+    "timestamp": ${timestamp:-0},
+    "hostname": "${hostname}${DNS_SUFFIX}"
+  }
+EOF
+    done < "$DEVICES_DB"
+    echo "]"
+}
+
+export_csv() {
+    echo "ip,mac,vendor,method,timestamp,hostname"
+    while IFS='|' read -r ip mac vendor method timestamp; do
+        [ -z "$ip" ] && continue
+        hostname=$(echo "$ip" | tr '.' '-')
+        # Escape commas in vendor
+        vendor_escaped=$(echo "$vendor" | sed 's/,/;/g')
+        echo "${ip},${mac},${vendor_escaped},${method},${timestamp:-0},${hostname}${DNS_SUFFIX}"
+    done < "$DEVICES_DB"
+}
+
+export_hosts() {
+    while IFS='|' read -r ip mac vendor method timestamp; do
+        [ -z "$ip" ] && continue
+        hostname=$(echo "$ip" | tr '.' '-')
+        echo "${ip} ${hostname}${DNS_SUFFIX}"
+    done < "$DEVICES_DB"
+}
+
+# Generate output
+case "$FORMAT" in
+    json)
+        RESULT=$(export_json)
+        ;;
+    csv)
+        RESULT=$(export_csv)
+        ;;
+    hosts)
+        RESULT=$(export_hosts)
+        ;;
+    *)
+        echo "Unknown format: $FORMAT"
+        exit 1
+        ;;
+esac
+
+# Output
+if [ -n "$OUTPUT" ]; then
+    echo "$RESULT" > "$OUTPUT"
+    echo "Exported to: $OUTPUT"
+else
+    echo "$RESULT"
+fi

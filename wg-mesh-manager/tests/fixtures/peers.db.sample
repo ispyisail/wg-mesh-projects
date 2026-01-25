@@ -1,0 +1,6 @@
+# Sample peers database for testing
+# NAME|TYPE|IP|ENDPOINT|PUBKEY|ALLOWED_IPS|KEEPALIVE|DESC
+server1|fixed|10.99.0.1/24|server1.example.com:51820|ABC123def456GHI789jkl012MNO345pqr678STU901vw==|10.99.0.1/32,192.168.1.0/24|0|Main server
+server2|fixed|10.99.0.2/24|server2.example.com:51820|XYZ987wvu654TSR321qpo098NML765kji432HGF109ed==|10.99.0.2/32,192.168.2.0/24|0|Backup server
+laptop1|dynamic|10.99.0.10/24||DEF456ghi789JKL012mno345PQR678stu901VWX234yz==|10.99.0.10/32|25|Work laptop
+phone1|mobile|10.99.0.20/24||GHI789jkl012MNO345pqr678STU901vwx234YZA567bc==|10.99.0.20/32|25|Mobile phone

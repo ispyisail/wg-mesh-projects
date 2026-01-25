@@ -1,0 +1,89 @@
+# WireGuard Mesh Discovery Configuration
+# Copy to /etc/wg-mesh/discovery.conf and customize
+
+# =============================================================================
+# SCAN SETTINGS
+# =============================================================================
+
+# How often to scan for devices (in seconds)
+# Default: 300 (5 minutes)
+SCAN_INTERVAL="300"
+
+# Scan methods to use (comma-separated)
+# Options: arp, nmap, mdns
+# Default: arp,mdns
+SCAN_METHODS="arp,mdns"
+
+# Timeout for scan operations (in seconds)
+SCAN_TIMEOUT="30"
+
+# Networks to scan (comma-separated CIDR notation)
+# Leave empty to auto-detect from interfaces
+SCAN_NETWORKS=""
+
+# Interfaces to scan (comma-separated)
+# Leave empty to scan all non-WAN interfaces
+SCAN_INTERFACES=""
+
+# =============================================================================
+# DNS INTEGRATION
+# =============================================================================
+
+# Enable DNS integration (adds discovered devices to dnsmasq)
+DNS_INTEGRATION="true"
+
+# DNS suffix for discovered devices
+# Example: printer.mesh, nas.mesh
+DNS_SUFFIX=".mesh"
+
+# Automatically update DNS after each scan
+DNS_UPDATE_ON_SCAN="true"
+
+# DNS hosts file location
+DNS_HOSTS_FILE="/tmp/wg-mesh-discovery-hosts"
+
+# =============================================================================
+# DEVICE IDENTIFICATION
+# =============================================================================
+
+# Enable automatic device type identification
+IDENTIFY_DEVICES="true"
+
+# Identify specific device types
+IDENTIFY_PRINTERS="true"
+IDENTIFY_NAS="true"
+IDENTIFY_CAMERAS="true"
+IDENTIFY_SERVERS="true"
+
+# Custom identification rules file (advanced)
+CUSTOM_RULES_FILE=""
+
+# =============================================================================
+# MESH SYNCHRONIZATION
+# =============================================================================
+
+# Share discoveries with other mesh nodes
+MESH_SYNC="true"
+
+# Sync interval (in seconds)
+MESH_SYNC_INTERVAL="60"
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+
+# Log file location
+DISCOVERY_LOG="/var/log/wg-mesh-discovery.log"
+
+# Log level: debug, info, warn, error
+DISCOVERY_LOG_LEVEL="info"
+
+# =============================================================================
+# WEB UI
+# =============================================================================
+
+# Enable web UI
+WEBUI_ENABLED="false"
+
+# Web UI port
+WEBUI_PORT="8080"

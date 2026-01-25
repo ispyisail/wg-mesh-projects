@@ -1,0 +1,150 @@
+#!/bin/sh
+# mesh-add - Add a peer to the mesh network
+# Part of WireGuard Mesh Manager
+
+set -e
+
+CONF_DIR="/etc/wg-mesh"
+LIB_DIR="/usr/share/wg-mesh/lib"
+
+# Source libraries
+[ -f "${LIB_DIR}/logging.sh" ] && . "${LIB_DIR}/logging.sh"
+[ -f "${LIB_DIR}/validation.sh" ] && . "${LIB_DIR}/validation.sh"
+[ -f "${LIB_DIR}/parsing.sh" ] && . "${LIB_DIR}/parsing.sh"
+
+usage() {
+    cat <<EOF
+Usage: mesh-add <name> <type> <ip/mask> <endpoint> [OPTIONS]
+
+Add a new peer to the mesh network.
+
+Arguments:
+    name        Unique peer name (alphanumeric, dash, underscore)
+    type        IP type: 'fixed' or 'dhcp'
+    ip/mask     Mesh IP address with CIDR (e.g., 10.99.0.2/24)
+    endpoint    Public endpoint (IP:PORT or hostname:PORT)
+
+Options:
+    --public-key KEY      WireGuard public key (required)
+    --allowed-ips CIDR    Additional allowed IPs (comma-separated)
+    --persistent-keepalive SECONDS  Keepalive interval (default: 25)
+    --description TEXT    Optional description
+    -h, --help            Show this help message
+
+Examples:
+    mesh-add office fixed 10.99.0.1/24 203.0.113.1:51820 --public-key ABC123...
+    mesh-add laptop dhcp 10.99.0.50/24 dynamic --public-key XYZ789...
+    mesh-add site-b fixed 10.99.0.2/24 vpn.example.com:51820 --public-key DEF456...
+EOF
+}
+
+# Check arguments
+if [ $# -lt 4 ]; then
+    usage
+    exit 1
+fi
+
+# Parse positional arguments
+PEER_NAME="$1"
+PEER_TYPE="$2"
+PEER_IP="$3"
+PEER_ENDPOINT="$4"
+shift 4
+
+# Default values
+PUBLIC_KEY=""
+ALLOWED_IPS=""
+KEEPALIVE="25"
+DESCRIPTION=""
+
+# Parse options
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --public-key)
+            PUBLIC_KEY="$2"
+            shift 2
+            ;;
+        --allowed-ips)
+            ALLOWED_IPS="$2"
+            shift 2
+            ;;
+        --persistent-keepalive)
+            KEEPALIVE="$2"
+            shift 2
+            ;;
+        --description)
+            DESCRIPTION="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+# Check if initialized
+if [ ! -f "${CONF_DIR}/mesh.conf" ]; then
+    echo "ERROR: Mesh not initialized. Run 'mesh-init' first."
+    exit 1
+fi
+
+# Validate inputs
+if ! validate_peer_name "$PEER_NAME" 2>/dev/null; then
+    echo "ERROR: Invalid peer name. Use alphanumeric, dash, underscore only."
+    exit 1
+fi
+
+if ! validate_ip_type "$PEER_TYPE" 2>/dev/null; then
+    echo "ERROR: Type must be 'fixed' or 'dhcp'"
+    exit 1
+fi
+
+if ! validate_cidr "$PEER_IP" 2>/dev/null; then
+    echo "ERROR: Invalid IP/CIDR format"
+    exit 1
+fi
+
+if [ -z "$PUBLIC_KEY" ]; then
+    echo "ERROR: --public-key is required"
+    exit 1
+fi
+
+# Check if peer already exists
+if grep -q "^${PEER_NAME}|" "${CONF_DIR}/peers.db" 2>/dev/null; then
+    echo "ERROR: Peer '${PEER_NAME}' already exists"
+    echo "Use 'mesh-update' to modify or 'mesh-remove' first"
+    exit 1
+fi
+
+# Build allowed IPs
+if [ -z "$ALLOWED_IPS" ]; then
+    # Default: just the peer's IP
+    PEER_ALLOWED="${PEER_IP%/*}/32"
+else
+    PEER_ALLOWED="${PEER_IP%/*}/32,${ALLOWED_IPS}"
+fi
+
+# Add to database
+# Format: NAME|TYPE|IP|ENDPOINT|PUBKEY|ALLOWED_IPS|KEEPALIVE|DESCRIPTION
+echo "${PEER_NAME}|${PEER_TYPE}|${PEER_IP}|${PEER_ENDPOINT}|${PUBLIC_KEY}|${PEER_ALLOWED}|${KEEPALIVE}|${DESCRIPTION}" >> "${CONF_DIR}/peers.db"
+
+echo "Peer '${PEER_NAME}' added successfully!"
+echo ""
+echo "  IP:       ${PEER_IP}"
+echo "  Endpoint: ${PEER_ENDPOINT}"
+echo "  Type:     ${PEER_TYPE}"
+echo ""
+echo "Run 'mesh-generate' to update configurations"
+echo "Run 'mesh-apply-local' to apply changes"

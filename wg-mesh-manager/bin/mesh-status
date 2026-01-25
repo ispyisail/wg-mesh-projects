@@ -1,0 +1,133 @@
+#!/bin/sh
+# mesh-status - Show mesh network status
+# Part of WireGuard Mesh Manager
+
+CONF_DIR="/etc/wg-mesh"
+
+usage() {
+    cat <<EOF
+Usage: mesh-status [OPTIONS]
+
+Show the current status of the mesh network.
+
+Options:
+    -a, --all       Show all details
+    -w, --watch     Continuously update (every 2s)
+    --json          Output as JSON
+    -h, --help      Show this help message
+
+Examples:
+    mesh-status
+    mesh-status --all
+    mesh-status --watch
+EOF
+}
+
+ALL=0
+WATCH=0
+JSON=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -a|--all)
+            ALL=1
+            shift
+            ;;
+        -w|--watch)
+            WATCH=1
+            shift
+            ;;
+        --json)
+            JSON=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Load mesh config
+if [ ! -f "${CONF_DIR}/mesh.conf" ]; then
+    echo "ERROR: Mesh not initialized"
+    exit 1
+fi
+. "${CONF_DIR}/mesh.conf"
+
+show_status() {
+    if [ "$JSON" = "1" ]; then
+        echo "{"
+        echo "  \"interface\": \"${MESH_INTERFACE}\","
+        echo "  \"status\": \"$(ip link show "$MESH_INTERFACE" >/dev/null 2>&1 && echo 'up' || echo 'down')\","
+        echo "  \"peers\": $(wc -l < "${CONF_DIR}/peers.db" 2>/dev/null | tr -d ' ' || echo 0)"
+        echo "}"
+        return
+    fi
+
+    echo "========================================"
+    echo "WireGuard Mesh Status"
+    echo "========================================"
+    echo ""
+
+    # Interface status
+    echo "Interface: ${MESH_INTERFACE}"
+    if ip link show "$MESH_INTERFACE" >/dev/null 2>&1; then
+        echo "Status:    UP"
+
+        # Get interface IP (POSIX compliant - no grep -P)
+        IP=$(ip -4 addr show "$MESH_INTERFACE" 2>/dev/null | grep 'inet ' | awk '{print $2}' | head -1)
+        [ -n "$IP" ] && echo "IP:        $IP"
+    else
+        echo "Status:    DOWN"
+    fi
+    echo ""
+
+    # Peer count
+    PEER_COUNT=$(wc -l < "${CONF_DIR}/peers.db" 2>/dev/null | tr -d ' ' || echo 0)
+    echo "Configured peers: ${PEER_COUNT}"
+    echo ""
+
+    # WireGuard status
+    if command -v wg >/dev/null 2>&1 && ip link show "$MESH_INTERFACE" >/dev/null 2>&1; then
+        echo "Peer Status:"
+        echo "------------"
+        wg show "$MESH_INTERFACE" 2>/dev/null | grep -A3 "^peer:" | while read -r line; do
+            case "$line" in
+                peer:*)
+                    PUBKEY=$(echo "$line" | cut -d' ' -f2 | cut -c1-16)
+                    # Find peer name
+                    NAME=$(grep "|${line#peer: }|" "${CONF_DIR}/peers.db" 2>/dev/null | cut -d'|' -f1 || echo "unknown")
+                    printf "  %-20s " "$NAME"
+                    ;;
+                *handshake*)
+                    HANDSHAKE=$(echo "$line" | grep -oE '[0-9]+ (second|minute|hour)s? ago' || echo "never")
+                    echo "last handshake: $HANDSHAKE"
+                    ;;
+            esac
+        done
+    fi
+
+    if [ "$ALL" = "1" ]; then
+        echo ""
+        echo "Full WireGuard Output:"
+        echo "----------------------"
+        wg show "$MESH_INTERFACE" 2>/dev/null || echo "(not available)"
+    fi
+}
+
+if [ "$WATCH" = "1" ]; then
+    while true; do
+        clear
+        show_status
+        echo ""
+        echo "(Press Ctrl+C to exit)"
+        sleep 2
+    done
+else
+    show_status
+fi

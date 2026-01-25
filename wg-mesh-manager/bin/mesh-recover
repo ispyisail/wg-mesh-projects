@@ -1,0 +1,160 @@
+#!/bin/sh
+# mesh-recover - Recover mesh configuration from backup
+# Part of WireGuard Mesh Manager
+
+set -e
+
+CONF_DIR="/etc/wg-mesh"
+BACKUP_DIR="${CONF_DIR}/backups"
+
+usage() {
+    cat <<EOF
+Usage: mesh-recover <backup-file> [OPTIONS]
+
+Recover mesh configuration from a backup.
+
+Arguments:
+    backup-file     Path to backup file
+
+Options:
+    --latest        Recover from most recent backup
+    --list          List available backups
+    --dry-run       Show what would be restored
+    -f, --force     Overwrite without confirmation
+    -h, --help      Show this help message
+
+Examples:
+    mesh-recover /path/to/backup.tar.gz
+    mesh-recover --latest
+    mesh-recover --list
+EOF
+}
+
+BACKUP_FILE=""
+LATEST=0
+LIST=0
+DRY_RUN=0
+FORCE=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --latest)
+            LATEST=1
+            shift
+            ;;
+        --list)
+            LIST=1
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        -f|--force)
+            FORCE=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+        *)
+            BACKUP_FILE="$1"
+            shift
+            ;;
+    esac
+done
+
+# List backups
+if [ "$LIST" = "1" ]; then
+    mesh-backup --list
+    exit 0
+fi
+
+# Find latest backup
+if [ "$LATEST" = "1" ]; then
+    BACKUP_FILE=$(ls -t "$BACKUP_DIR"/mesh-backup-*.tar.gz 2>/dev/null | head -1)
+    if [ -z "$BACKUP_FILE" ]; then
+        echo "ERROR: No backups found"
+        exit 1
+    fi
+    echo "Using latest backup: $BACKUP_FILE"
+fi
+
+# Check backup file
+if [ -z "$BACKUP_FILE" ]; then
+    usage
+    exit 1
+fi
+
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "ERROR: Backup file not found: $BACKUP_FILE"
+    exit 1
+fi
+
+# Check for root
+if [ "$(id -u)" != "0" ] && [ "$DRY_RUN" != "1" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+# Show what's in backup
+echo "Backup contents:"
+tar -tzf "$BACKUP_FILE" | sed 's/^/  /'
+
+if [ "$DRY_RUN" = "1" ]; then
+    echo ""
+    echo "(dry-run: no changes made)"
+    exit 0
+fi
+
+# Confirm
+if [ "$FORCE" != "1" ]; then
+    echo ""
+    echo "This will overwrite current configuration."
+    printf "Continue? [y/N] "
+    read -r REPLY
+    case "$REPLY" in
+        [Yy]*)
+            ;;
+        *)
+            echo "Aborted."
+            exit 0
+            ;;
+    esac
+fi
+
+# Create backup of current state
+echo ""
+echo "Backing up current configuration..."
+mesh-backup --auto 2>/dev/null || true
+
+# Extract backup
+echo "Restoring from backup..."
+TEMP_DIR=$(mktemp -d)
+tar -xzf "$BACKUP_FILE" -C "$TEMP_DIR"
+
+# Restore files
+cp "${TEMP_DIR}/wg-mesh/mesh.conf" "${CONF_DIR}/" 2>/dev/null || true
+cp "${TEMP_DIR}/wg-mesh/peers.db" "${CONF_DIR}/" 2>/dev/null || true
+
+# Optionally restore keys
+if [ -d "${TEMP_DIR}/wg-mesh/keys" ]; then
+    echo "Restoring keys..."
+    cp -r "${TEMP_DIR}/wg-mesh/keys" "${CONF_DIR}/"
+    chmod 700 "${CONF_DIR}/keys"
+    chmod 600 "${CONF_DIR}/keys/privatekey" 2>/dev/null || true
+fi
+
+# Cleanup
+rm -rf "$TEMP_DIR"
+
+echo ""
+echo "Configuration restored successfully!"
+echo ""
+echo "Run 'mesh-generate' to regenerate WireGuard config"
+echo "Run 'mesh-apply-local' to apply changes"

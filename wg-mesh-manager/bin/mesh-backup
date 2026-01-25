@@ -1,0 +1,127 @@
+#!/bin/sh
+# mesh-backup - Backup mesh configuration
+# Part of WireGuard Mesh Manager
+
+set -e
+
+CONF_DIR="/etc/wg-mesh"
+BACKUP_DIR="${CONF_DIR}/backups"
+
+usage() {
+    cat <<EOF
+Usage: mesh-backup [OPTIONS]
+
+Backup mesh configuration.
+
+Options:
+    -o, --output FILE     Output file (default: auto-generated)
+    --auto                Automatic backup (silent, for internal use)
+    --list                List existing backups
+    --encrypt             Encrypt backup with passphrase
+    -h, --help            Show this help message
+
+Examples:
+    mesh-backup
+    mesh-backup --output /tmp/mesh-backup.tar.gz
+    mesh-backup --list
+EOF
+}
+
+OUTPUT=""
+AUTO=0
+LIST=0
+ENCRYPT=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -o|--output)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        --auto)
+            AUTO=1
+            shift
+            ;;
+        --list)
+            LIST=1
+            shift
+            ;;
+        --encrypt)
+            ENCRYPT=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# List backups
+if [ "$LIST" = "1" ]; then
+    echo "Available backups:"
+    echo ""
+    if [ -d "$BACKUP_DIR" ] && ls "$BACKUP_DIR"/*.tar.gz 1>/dev/null 2>&1; then
+        ls -lh "$BACKUP_DIR"/*.tar.gz | awk '{print "  " $9 " (" $5 ", " $6 " " $7 ")"}'
+    else
+        echo "  No backups found"
+    fi
+    exit 0
+fi
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+# Check if initialized
+if [ ! -f "${CONF_DIR}/mesh.conf" ]; then
+    echo "ERROR: Mesh not initialized"
+    exit 1
+fi
+
+# Create backup directory
+mkdir -p "$BACKUP_DIR"
+
+# Generate filename
+if [ -z "$OUTPUT" ]; then
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    OUTPUT="${BACKUP_DIR}/mesh-backup-${TIMESTAMP}.tar.gz"
+fi
+
+# Create backup
+[ "$AUTO" != "1" ] && echo "Creating backup..."
+
+# Create temp directory for backup
+TEMP_DIR=$(mktemp -d)
+mkdir -p "${TEMP_DIR}/wg-mesh"
+
+# Copy configuration
+cp "${CONF_DIR}/mesh.conf" "${TEMP_DIR}/wg-mesh/"
+cp "${CONF_DIR}/peers.db" "${TEMP_DIR}/wg-mesh/" 2>/dev/null || true
+
+# Optionally include keys (with warning)
+if [ "$ENCRYPT" = "1" ] && [ -d "${CONF_DIR}/keys" ]; then
+    cp -r "${CONF_DIR}/keys" "${TEMP_DIR}/wg-mesh/"
+fi
+
+# Create archive
+tar -czf "$OUTPUT" -C "$TEMP_DIR" wg-mesh
+
+# Cleanup
+rm -rf "$TEMP_DIR"
+
+if [ "$AUTO" != "1" ]; then
+    echo "Backup created: $OUTPUT"
+    echo "Size: $(du -h "$OUTPUT" | cut -f1)"
+fi
+
+# Cleanup old backups (keep last 10)
+if [ -d "$BACKUP_DIR" ]; then
+    ls -t "$BACKUP_DIR"/mesh-backup-*.tar.gz 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
+fi

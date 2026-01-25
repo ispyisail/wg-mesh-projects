@@ -1,0 +1,82 @@
+#!/bin/sh
+# mesh-discovery-enable - Enable automatic device discovery
+# Part of WireGuard Mesh Discovery
+
+CONF_DIR="/etc/wg-mesh"
+DISCOVERY_CONF="${CONF_DIR}/discovery.conf"
+CRON_FILE="/etc/crontabs/root"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-enable [OPTIONS]
+
+Enable automatic device discovery scanning.
+
+Options:
+    --interval MIN    Scan interval in minutes (default: 5)
+    --status          Show current status
+    -h, --help        Show this help message
+EOF
+}
+
+INTERVAL=5
+STATUS=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --interval)
+            INTERVAL="$2"
+            shift 2
+            ;;
+        --status)
+            STATUS=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Check status
+if [ "$STATUS" = "1" ]; then
+    if grep -q "mesh-discovery-scan" "$CRON_FILE" 2>/dev/null; then
+        echo "Auto-scan: ENABLED"
+        grep "mesh-discovery-scan" "$CRON_FILE"
+    else
+        echo "Auto-scan: DISABLED"
+    fi
+    exit 0
+fi
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+echo "Enabling automatic discovery..."
+
+# Remove existing entry
+if [ -f "$CRON_FILE" ]; then
+    grep -v "mesh-discovery-scan" "$CRON_FILE" > "${CRON_FILE}.tmp"
+    mv "${CRON_FILE}.tmp" "$CRON_FILE"
+fi
+
+# Add new cron entry
+echo "*/${INTERVAL} * * * * /usr/bin/mesh-discovery-scan >/dev/null 2>&1" >> "$CRON_FILE"
+
+# Restart cron
+if [ -x /etc/init.d/cron ]; then
+    /etc/init.d/cron restart 2>/dev/null || true
+fi
+
+echo "Auto-scan enabled (every $INTERVAL minutes)"
+echo ""
+echo "Use 'mesh-discovery-disable' to turn off"
+echo "Use 'mesh-discovery-enable --status' to check"

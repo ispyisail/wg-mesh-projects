@@ -1,0 +1,112 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Tests
+      run: |
+        chmod +x scripts/test-all.sh
+        ./scripts/test-all.sh
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Get Version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Verify Version Consistency
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        echo "Checking version consistency for v$VERSION"
+        # Check that version matches in key files
+        if [ -f wg-mesh-manager/build-package.sh ]; then
+          if ! grep -q "VERSION=\"$VERSION\"" wg-mesh-manager/build-package.sh; then
+            echo "WARNING: Version mismatch in wg-mesh-manager/build-package.sh"
+          fi
+        fi
+
+    - name: Build All Packages
+      run: |
+        chmod +x scripts/build-all.sh
+        ./scripts/build-all.sh
+
+    - name: Extract Changelog
+      id: changelog
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        # Extract current version's changelog section
+        if [ -f CHANGELOG.md ]; then
+          sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -1 > CURRENT_CHANGES.md
+        fi
+        if [ ! -s CURRENT_CHANGES.md ]; then
+          echo "See CHANGELOG.md for details." > CURRENT_CHANGES.md
+        fi
+
+    - name: Create Release Notes
+      run: |
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        cat > RELEASE_NOTES.md <<EOF
+        ## Downloads
+
+        | Package | Description |
+        |---------|-------------|
+        | \`wg-mesh-manager-${VERSION}.tar.gz\` | Core mesh networking (required) |
+        | \`wg-mesh-discovery-${VERSION}.tar.gz\` | Device discovery (optional) |
+
+        ## Installation
+
+        \`\`\`bash
+        # Install mesh manager
+        tar -xzf wg-mesh-manager-${VERSION}.tar.gz
+        cd wg-mesh-manager-${VERSION}
+        ./install.sh
+
+        # Optional: Install discovery
+        tar -xzf wg-mesh-discovery-${VERSION}.tar.gz
+        cd wg-mesh-discovery-${VERSION}
+        ./install.sh
+        \`\`\`
+
+        ## Changes
+
+        $(cat CURRENT_CHANGES.md)
+
+        ## Checksums
+
+        \`\`\`
+        $(cat releases/*.sha256 2>/dev/null || echo "See .sha256 files")
+        \`\`\`
+
+        ## Verification
+
+        \`\`\`bash
+        sha256sum -c *.sha256
+        \`\`\`
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: v${{ steps.get_version.outputs.VERSION }}
+        body_path: RELEASE_NOTES.md
+        files: |
+          releases/*.tar.gz
+          releases/*.sha256
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

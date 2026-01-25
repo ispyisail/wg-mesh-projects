@@ -1,0 +1,179 @@
+#!/bin/sh
+# mesh-discovery-scan - Scan for devices on the network
+# Part of WireGuard Mesh Discovery
+
+CONF_DIR="/etc/wg-mesh"
+DISCOVERY_CONF="${CONF_DIR}/discovery.conf"
+DEVICES_DB="${CONF_DIR}/discovery/devices.db"
+CACHE_DIR="${CONF_DIR}/discovery/cache"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-scan [OPTIONS]
+
+Scan the network for devices.
+
+Options:
+    --network CIDR    Scan specific network
+    --method METHOD   Use specific method (arp, nmap, mdns)
+    --verbose         Show detailed output
+    -h, --help        Show this help message
+EOF
+}
+
+NETWORK=""
+METHOD=""
+VERBOSE=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --network)
+            NETWORK="$2"
+            shift 2
+            ;;
+        --method)
+            METHOD="$2"
+            shift 2
+            ;;
+        --verbose)
+            VERBOSE=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Load config
+if [ -f "$DISCOVERY_CONF" ]; then
+    . "$DISCOVERY_CONF"
+fi
+
+# Defaults
+: "${SCAN_METHODS:=arp}"
+: "${SCAN_TIMEOUT:=30}"
+
+echo "Scanning for devices..."
+[ "$VERBOSE" = "1" ] && echo "Methods: $SCAN_METHODS"
+
+# Check for required commands
+if ! command -v ip >/dev/null 2>&1; then
+    echo "ERROR: 'ip' command not found"
+    exit 1
+fi
+
+# Detect networks to scan
+if [ -z "$NETWORK" ]; then
+    NETWORKS=$(ip -4 addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}')
+else
+    NETWORKS="$NETWORK"
+fi
+
+if [ -z "$NETWORKS" ]; then
+    echo "ERROR: No networks detected"
+    exit 1
+fi
+
+# Create devices file
+mkdir -p "$(dirname "$DEVICES_DB")"
+TEMP_DEVICES=$(mktemp)
+
+# ARP scan
+scan_arp() {
+    net="$1"
+    [ "$VERBOSE" = "1" ] && echo "ARP scanning $net..."
+
+    if command -v arp-scan >/dev/null 2>&1; then
+        # Parse arp-scan output properly (handles vendor names with spaces)
+        arp-scan --localnet 2>/dev/null | grep -E '^[0-9]' | while read -r line; do
+            ip=$(echo "$line" | awk '{print $1}')
+            mac=$(echo "$line" | awk '{print $2}')
+            # Vendor is everything after the first two fields
+            vendor=$(echo "$line" | awk '{$1=""; $2=""; print}' | sed 's/^[ \t]*//')
+            [ -n "$ip" ] && [ -n "$mac" ] && echo "${ip}|${mac}|${vendor:-unknown}|arp|$(date +%s)"
+        done
+    else
+        # Fallback: ping sweep + ARP table (limit concurrency)
+        base="${net%.*}"
+        # Batch pings to avoid overload (50 at a time)
+        i=1
+        while [ $i -le 254 ]; do
+            j=0
+            while [ $j -lt 50 ] && [ $((i + j)) -le 254 ]; do
+                ping -c 1 -W 1 "${base}.$((i + j))" >/dev/null 2>&1 &
+                j=$((j + 1))
+            done
+            wait
+            i=$((i + 50))
+        done
+        arp -n 2>/dev/null | grep -v incomplete | grep -E '^[0-9]' | while read -r ip type mac rest; do
+            echo "${ip}|${mac}|unknown|arp|$(date +%s)"
+        done
+    fi
+}
+
+# mDNS scan
+scan_mdns() {
+    [ "$VERBOSE" = "1" ] && echo "mDNS scanning..."
+
+    if command -v avahi-browse >/dev/null 2>&1; then
+        timeout "$SCAN_TIMEOUT" avahi-browse -at 2>/dev/null | while read type domain name; do
+            echo "mdns:${name}|${type}|mdns|$(date +%s)"
+        done
+    fi
+}
+
+# NMAP scan
+scan_nmap() {
+    local net="$1"
+    [ "$VERBOSE" = "1" ] && echo "NMAP scanning $net..."
+
+    if command -v nmap >/dev/null 2>&1; then
+        nmap -sn "$net" 2>/dev/null | grep -E 'Nmap scan|MAC Address' | \
+        awk '/Nmap scan/{ip=$NF} /MAC Address/{print ip"|"$3"|"substr($0, index($0,$4))"|nmap|"systime()}'
+    fi
+}
+
+# Run scans based on configured methods
+for method in $(echo "$SCAN_METHODS" | tr ',' ' '); do
+    case "$method" in
+        arp)
+            for net in $NETWORKS; do
+                scan_arp "$net" >> "$TEMP_DEVICES"
+            done
+            ;;
+        mdns)
+            scan_mdns >> "$TEMP_DEVICES"
+            ;;
+        nmap)
+            for net in $NETWORKS; do
+                scan_nmap "$net" >> "$TEMP_DEVICES"
+            done
+            ;;
+    esac
+done
+
+# Deduplicate and merge with existing
+if [ -f "$DEVICES_DB" ]; then
+    cat "$DEVICES_DB" >> "$TEMP_DEVICES"
+fi
+
+# Sort and dedupe by IP/MAC
+sort -t'|' -k1,1 -u "$TEMP_DEVICES" > "$DEVICES_DB"
+rm -f "$TEMP_DEVICES"
+
+# Count results
+DEVICE_COUNT=$(wc -l < "$DEVICES_DB" 2>/dev/null | tr -d ' ' || echo 0)
+echo ""
+echo "Scan complete: $DEVICE_COUNT device(s) found"
+
+# Update DNS if enabled
+if [ "${DNS_UPDATE_ON_SCAN}" = "true" ]; then
+    mesh-discovery-update-dns 2>/dev/null || true
+fi

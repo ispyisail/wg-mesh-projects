@@ -1,0 +1,105 @@
+#!/bin/sh
+# mesh-apply-local - Apply WireGuard configuration locally
+# Part of WireGuard Mesh Manager
+
+set -e
+
+CONF_DIR="/etc/wg-mesh"
+WG_DIR="/etc/wireguard"
+
+usage() {
+    cat <<EOF
+Usage: mesh-apply-local [OPTIONS]
+
+Apply the generated WireGuard configuration to this system.
+
+Options:
+    --restart       Force restart interface (default: sync)
+    --no-backup     Skip backup before applying
+    -h, --help      Show this help message
+
+Examples:
+    mesh-apply-local
+    mesh-apply-local --restart
+EOF
+}
+
+RESTART=0
+NO_BACKUP=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --restart)
+            RESTART=1
+            shift
+            ;;
+        --no-backup)
+            NO_BACKUP=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+# Load mesh config
+if [ ! -f "${CONF_DIR}/mesh.conf" ]; then
+    echo "ERROR: Mesh not initialized"
+    exit 1
+fi
+. "${CONF_DIR}/mesh.conf"
+
+# Check config exists
+CONFIG_FILE="${WG_DIR}/${MESH_INTERFACE}.conf"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "ERROR: Configuration not found: $CONFIG_FILE"
+    echo "Run 'mesh-generate' first"
+    exit 1
+fi
+
+echo "Applying WireGuard configuration..."
+echo ""
+
+# Backup current state
+if [ "$NO_BACKUP" != "1" ]; then
+    mesh-backup --auto 2>/dev/null || true
+fi
+
+# Check if interface exists
+if ip link show "$MESH_INTERFACE" >/dev/null 2>&1; then
+    if [ "$RESTART" = "1" ]; then
+        echo "Restarting interface ${MESH_INTERFACE}..."
+        wg-quick down "$MESH_INTERFACE" 2>/dev/null || true
+        wg-quick up "$MESH_INTERFACE"
+    else
+        echo "Syncing configuration to ${MESH_INTERFACE}..."
+        # Use temp file instead of process substitution (POSIX compliant)
+        SYNC_TEMP=$(mktemp)
+        wg-quick strip "$MESH_INTERFACE" > "$SYNC_TEMP"
+        wg syncconf "$MESH_INTERFACE" "$SYNC_TEMP"
+        rm -f "$SYNC_TEMP"
+    fi
+else
+    echo "Starting interface ${MESH_INTERFACE}..."
+    wg-quick up "$MESH_INTERFACE"
+fi
+
+echo ""
+echo "Configuration applied successfully!"
+echo ""
+
+# Show status
+echo "Interface status:"
+wg show "$MESH_INTERFACE" 2>/dev/null | head -10 || echo "  (interface starting...)"

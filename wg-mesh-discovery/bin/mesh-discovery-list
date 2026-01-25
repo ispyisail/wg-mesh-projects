@@ -1,0 +1,116 @@
+#!/bin/sh
+# mesh-discovery-list - List discovered devices
+# Part of WireGuard Mesh Discovery
+
+CONF_DIR="/etc/wg-mesh"
+DEVICES_DB="${CONF_DIR}/discovery/devices.db"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-list [OPTIONS]
+
+List discovered devices.
+
+Options:
+    --type TYPE       Filter by type (printer, nas, camera, etc.)
+    --network CIDR    Filter by network
+    --json            Output as JSON
+    -v, --verbose     Show detailed info
+    -h, --help        Show this help message
+EOF
+}
+
+FILTER_TYPE=""
+FILTER_NETWORK=""
+JSON=0
+VERBOSE=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --type)
+            FILTER_TYPE="$2"
+            shift 2
+            ;;
+        --network)
+            FILTER_NETWORK="$2"
+            shift 2
+            ;;
+        --json)
+            JSON=1
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+if [ ! -f "$DEVICES_DB" ] || [ ! -s "$DEVICES_DB" ]; then
+    if [ "$JSON" = "1" ]; then
+        echo "[]"
+    else
+        echo "No devices discovered yet."
+        echo "Run 'mesh-discovery-scan' first."
+    fi
+    exit 0
+fi
+
+# JSON output
+if [ "$JSON" = "1" ]; then
+    echo "["
+    FIRST=1
+    while IFS='|' read -r ip mac vendor method timestamp; do
+        [ -z "$ip" ] && continue
+        [ "$FIRST" = "1" ] && FIRST=0 || echo ","
+        printf '  {"ip":"%s","mac":"%s","vendor":"%s","method":"%s","timestamp":%s}' \
+            "$ip" "$mac" "$vendor" "$method" "${timestamp:-0}"
+    done < "$DEVICES_DB"
+    echo ""
+    echo "]"
+    exit 0
+fi
+
+# Table output
+if [ "$VERBOSE" = "1" ]; then
+    printf "%-16s %-18s %-25s %-8s %s\n" "IP" "MAC" "VENDOR" "METHOD" "LAST SEEN"
+    printf "%-16s %-18s %-25s %-8s %s\n" "--" "---" "------" "------" "---------"
+else
+    printf "%-16s %-18s %s\n" "IP" "MAC" "VENDOR"
+    printf "%-16s %-18s %s\n" "--" "---" "------"
+fi
+
+while IFS='|' read -r ip mac vendor method timestamp; do
+    [ -z "$ip" ] && continue
+
+    # Apply type filter (only if filter is set)
+    if [ -n "$FILTER_TYPE" ]; then
+        echo "$vendor" | grep -qi "$FILTER_TYPE" || continue
+    fi
+
+    # Truncate vendor for display (POSIX compliant)
+    vendor_short=$(printf "%.25s" "$vendor")
+    vendor_display=$(printf "%.40s" "$vendor")
+
+    if [ "$VERBOSE" = "1" ]; then
+        if [ -n "$timestamp" ]; then
+            last_seen=$(date -d "@$timestamp" "+%Y-%m-%d %H:%M" 2>/dev/null || date -r "$timestamp" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "unknown")
+        else
+            last_seen="unknown"
+        fi
+        printf "%-16s %-18s %-25s %-8s %s\n" "$ip" "$mac" "$vendor_short" "$method" "$last_seen"
+    else
+        printf "%-16s %-18s %s\n" "$ip" "$mac" "$vendor_display"
+    fi
+done < "$DEVICES_DB"
+
+echo ""
+echo "Total: $(wc -l < "$DEVICES_DB" | tr -d ' ') device(s)"

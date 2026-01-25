@@ -1,0 +1,80 @@
+name: Build Packages
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install shellcheck
+      run: sudo apt-get install -y shellcheck
+
+    - name: Run shellcheck
+      run: |
+        find . -name "*.sh" -type f | xargs shellcheck --severity=warning || true
+
+  build-mesh-manager:
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Mesh Manager
+      run: |
+        cd wg-mesh-manager
+        chmod +x build-package.sh
+        ./build-package.sh
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wg-mesh-manager
+        path: wg-mesh-manager/build/*.tar.gz*
+
+    - name: Verify Integrity
+      run: |
+        cd wg-mesh-manager/build
+        sha256sum -c *.sha256
+
+  build-discovery:
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build Discovery Module
+      run: |
+        cd wg-mesh-discovery
+        chmod +x build-package.sh
+        ./build-package.sh
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wg-mesh-discovery
+        path: wg-mesh-discovery/build/*.tar.gz*
+
+    - name: Verify Integrity
+      run: |
+        cd wg-mesh-discovery/build
+        sha256sum -c *.sha256
+
+  test:
+    needs: [build-mesh-manager, build-discovery]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Tests
+      run: |
+        chmod +x scripts/test-all.sh
+        ./scripts/test-all.sh

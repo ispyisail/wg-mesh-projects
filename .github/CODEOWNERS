@@ -1,0 +1,9 @@
+# Code owners for automatic PR review requests
+# Replace YOUR_USERNAME with your GitHub username
+
+# Default owner for everything
+*                              @YOUR_USERNAME
+
+# Specific areas can have different owners
+# /wg-mesh-discovery/          @discovery-team
+# /docs/                       @docs-team

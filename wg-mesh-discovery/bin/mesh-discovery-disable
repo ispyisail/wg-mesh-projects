@@ -1,0 +1,55 @@
+#!/bin/sh
+# mesh-discovery-disable - Disable automatic device discovery
+# Part of WireGuard Mesh Discovery
+
+CRON_FILE="/etc/crontabs/root"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-disable [OPTIONS]
+
+Disable automatic device discovery scanning.
+
+Options:
+    -h, --help      Show this help message
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+echo "Disabling automatic discovery..."
+
+# Remove cron entry
+if [ -f "$CRON_FILE" ]; then
+    if grep -q "mesh-discovery-scan" "$CRON_FILE"; then
+        grep -v "mesh-discovery-scan" "$CRON_FILE" > "${CRON_FILE}.tmp"
+        mv "${CRON_FILE}.tmp" "$CRON_FILE"
+        echo "Auto-scan disabled"
+
+        # Restart cron
+        if [ -x /etc/init.d/cron ]; then
+            /etc/init.d/cron restart 2>/dev/null || true
+        fi
+    else
+        echo "Auto-scan was not enabled"
+    fi
+else
+    echo "Auto-scan was not enabled"
+fi

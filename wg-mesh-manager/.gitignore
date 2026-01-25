@@ -1,0 +1,18 @@
+# Build artifacts
+build/
+*.tar.gz
+*.tar.gz.sha256
+
+# Test files
+test-env/
+*.log
+
+# Editor files
+*.swp
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

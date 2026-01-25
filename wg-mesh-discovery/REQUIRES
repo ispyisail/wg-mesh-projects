@@ -1,0 +1,8 @@
+# Required dependencies
+wg-mesh-manager >= 1.0.0
+dnsmasq >= 2.80
+
+# Optional dependencies (for enhanced functionality)
+# nmap >= 7.0
+# avahi-daemon >= 0.7
+# arp-scan >= 1.9

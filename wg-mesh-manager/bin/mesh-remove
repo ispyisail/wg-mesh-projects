@@ -1,0 +1,101 @@
+#!/bin/sh
+# mesh-remove - Remove a peer from the mesh network
+# Part of WireGuard Mesh Manager
+
+set -e
+
+CONF_DIR="/etc/wg-mesh"
+
+usage() {
+    cat <<EOF
+Usage: mesh-remove <name> [OPTIONS]
+
+Remove a peer from the mesh network.
+
+Arguments:
+    name        Name of the peer to remove
+
+Options:
+    -f, --force     Remove without confirmation
+    -h, --help      Show this help message
+
+Examples:
+    mesh-remove laptop
+    mesh-remove old-server --force
+EOF
+}
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+PEER_NAME="$1"
+FORCE=0
+shift
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -f|--force)
+            FORCE=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+# Check if initialized
+if [ ! -f "${CONF_DIR}/peers.db" ]; then
+    echo "ERROR: Mesh not initialized"
+    exit 1
+fi
+
+# Check if peer exists
+if ! grep -q "^${PEER_NAME}|" "${CONF_DIR}/peers.db"; then
+    echo "ERROR: Peer '${PEER_NAME}' not found"
+    exit 1
+fi
+
+# Get peer info for display
+PEER_INFO=$(grep "^${PEER_NAME}|" "${CONF_DIR}/peers.db")
+PEER_IP=$(echo "$PEER_INFO" | cut -d'|' -f3)
+
+# Confirm unless forced
+if [ "$FORCE" != "1" ]; then
+    echo "About to remove peer:"
+    echo "  Name: ${PEER_NAME}"
+    echo "  IP:   ${PEER_IP}"
+    echo ""
+    printf "Continue? [y/N] "
+    read -r REPLY
+    case "$REPLY" in
+        [Yy]*)
+            ;;
+        *)
+            echo "Aborted."
+            exit 0
+            ;;
+    esac
+fi
+
+# Remove from database
+grep -v "^${PEER_NAME}|" "${CONF_DIR}/peers.db" > "${CONF_DIR}/peers.db.tmp"
+mv "${CONF_DIR}/peers.db.tmp" "${CONF_DIR}/peers.db"
+
+echo "Peer '${PEER_NAME}' removed."
+echo ""
+echo "Run 'mesh-generate' to update configurations"
+echo "Run 'mesh-apply-local' to apply changes"

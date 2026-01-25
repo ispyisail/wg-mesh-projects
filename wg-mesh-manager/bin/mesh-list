@@ -1,0 +1,116 @@
+#!/bin/sh
+# mesh-list - List all peers in the mesh network
+# Part of WireGuard Mesh Manager
+
+CONF_DIR="/etc/wg-mesh"
+
+usage() {
+    cat <<EOF
+Usage: mesh-list [OPTIONS]
+
+List all peers in the mesh network.
+
+Options:
+    -v, --verbose     Show detailed information
+    -q, --quiet       Show only names
+    --json            Output as JSON
+    -h, --help        Show this help message
+
+Examples:
+    mesh-list
+    mesh-list --verbose
+    mesh-list --json
+EOF
+}
+
+VERBOSE=0
+QUIET=0
+JSON=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=1
+            shift
+            ;;
+        -q|--quiet)
+            QUIET=1
+            shift
+            ;;
+        --json)
+            JSON=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Check if initialized
+if [ ! -f "${CONF_DIR}/peers.db" ]; then
+    echo "ERROR: Mesh not initialized. Run 'mesh-init' first."
+    exit 1
+fi
+
+# Check if empty
+if [ ! -s "${CONF_DIR}/peers.db" ]; then
+    if [ "$JSON" = "1" ]; then
+        echo "[]"
+    else
+        echo "No peers configured."
+    fi
+    exit 0
+fi
+
+# JSON output
+if [ "$JSON" = "1" ]; then
+    echo "["
+    FIRST=1
+    while IFS='|' read -r name type ip endpoint pubkey allowed keepalive desc; do
+        [ "$FIRST" = "1" ] && FIRST=0 || echo ","
+        printf '  {"name":"%s","type":"%s","ip":"%s","endpoint":"%s","public_key":"%s"}' \
+            "$name" "$type" "$ip" "$endpoint" "$pubkey"
+    done < "${CONF_DIR}/peers.db"
+    echo ""
+    echo "]"
+    exit 0
+fi
+
+# Quiet output
+if [ "$QUIET" = "1" ]; then
+    cut -d'|' -f1 "${CONF_DIR}/peers.db"
+    exit 0
+fi
+
+# Normal/verbose output
+if [ "$VERBOSE" = "1" ]; then
+    echo "Mesh Peers (Detailed)"
+    echo "====================="
+    echo ""
+    while IFS='|' read -r name type ip endpoint pubkey allowed keepalive desc; do
+        echo "Name:       $name"
+        echo "Type:       $type"
+        echo "IP:         $ip"
+        echo "Endpoint:   $endpoint"
+        echo "Public Key: $pubkey"
+        echo "Allowed:    $allowed"
+        [ -n "$desc" ] && echo "Description: $desc"
+        echo "---"
+    done < "${CONF_DIR}/peers.db"
+else
+    # Table format
+    printf "%-20s %-8s %-18s %s\n" "NAME" "TYPE" "IP" "ENDPOINT"
+    printf "%-20s %-8s %-18s %s\n" "----" "----" "--" "--------"
+    while IFS='|' read -r name type ip endpoint pubkey allowed keepalive desc; do
+        printf "%-20s %-8s %-18s %s\n" "$name" "$type" "$ip" "$endpoint"
+    done < "${CONF_DIR}/peers.db"
+fi
+
+echo ""
+echo "Total peers: $(wc -l < "${CONF_DIR}/peers.db" | tr -d ' ')"

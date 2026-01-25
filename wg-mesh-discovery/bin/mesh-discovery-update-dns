@@ -1,0 +1,113 @@
+#!/bin/sh
+# mesh-discovery-update-dns - Update DNS records for discovered devices
+# Part of WireGuard Mesh Discovery
+
+CONF_DIR="/etc/wg-mesh"
+DISCOVERY_CONF="${CONF_DIR}/discovery.conf"
+DEVICES_DB="${CONF_DIR}/discovery/devices.db"
+DNS_HOSTS="/tmp/wg-mesh-discovery-hosts"
+
+# Load config
+if [ -f "$DISCOVERY_CONF" ]; then
+    . "$DISCOVERY_CONF"
+fi
+
+: "${DNS_SUFFIX:=.mesh}"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-update-dns [OPTIONS]
+
+Update DNS records for discovered devices.
+
+Options:
+    --restart       Restart dnsmasq after update
+    --dry-run       Show what would be added
+    -h, --help      Show this help message
+EOF
+}
+
+RESTART=0
+DRY_RUN=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --restart)
+            RESTART=1
+            shift
+            ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+if [ ! -f "$DEVICES_DB" ]; then
+    echo "No devices discovered."
+    exit 0
+fi
+
+echo "Updating DNS records..."
+
+# Generate hosts file
+TEMP_HOSTS=$(mktemp)
+
+while IFS='|' read -r ip mac vendor method timestamp; do
+    [ -z "$ip" ] && continue
+
+    # Generate hostname from IP
+    hostname=$(echo "$ip" | tr '.' '-')
+
+    # Try to get a better name from vendor
+    case "$vendor" in
+        *[Pp]rinter*|*[Hh][Pp]*|*[Cc]anon*|*[Ee]pson*)
+            hostname="printer-${hostname##*-}"
+            ;;
+        *[Nn][Aa][Ss]*|*[Ss]ynology*|*[Qq][Nn][Aa][Pp]*)
+            hostname="nas-${hostname##*-}"
+            ;;
+        *[Cc]amera*|*[Hh]ikvision*)
+            hostname="camera-${hostname##*-}"
+            ;;
+    esac
+
+    full_hostname="${hostname}${DNS_SUFFIX}"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        echo "  $ip -> $full_hostname"
+    else
+        echo "$ip $full_hostname" >> "$TEMP_HOSTS"
+    fi
+done < "$DEVICES_DB"
+
+if [ "$DRY_RUN" = "1" ]; then
+    rm -f "$TEMP_HOSTS"
+    exit 0
+fi
+
+# Update hosts file
+mv "$TEMP_HOSTS" "$DNS_HOSTS"
+
+# Count entries
+ENTRY_COUNT=$(wc -l < "$DNS_HOSTS" 2>/dev/null | tr -d ' ' || echo 0)
+echo "Updated $ENTRY_COUNT DNS entries"
+
+# Restart dnsmasq if requested
+if [ "$RESTART" = "1" ]; then
+    if [ -x /etc/init.d/dnsmasq ]; then
+        /etc/init.d/dnsmasq restart
+        echo "dnsmasq restarted"
+    fi
+else
+    # Signal dnsmasq to reload
+    killall -HUP dnsmasq 2>/dev/null || true
+fi

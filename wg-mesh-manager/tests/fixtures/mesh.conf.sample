@@ -1,0 +1,7 @@
+# Sample mesh configuration for testing
+MESH_NAME=test-mesh
+MESH_SUBNET=10.99.0.0/24
+LISTEN_PORT=51820
+INTERFACE=wg-mesh
+LOCAL_IP=10.99.0.1/24
+LOCAL_ENDPOINT=test.example.com:51820

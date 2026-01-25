@@ -1,0 +1,192 @@
+#!/bin/sh
+# mesh-health - Check mesh network health
+# Part of WireGuard Mesh Manager
+
+CONF_DIR="/etc/wg-mesh"
+
+usage() {
+    cat <<EOF
+Usage: mesh-health [OPTIONS]
+
+Run health checks on the mesh network.
+
+Options:
+    -v, --verbose     Show detailed output
+    --fix             Attempt to fix issues
+    --json            Output as JSON
+    -h, --help        Show this help message
+
+Examples:
+    mesh-health
+    mesh-health --verbose
+    mesh-health --fix
+EOF
+}
+
+VERBOSE=0
+FIX=0
+JSON=0
+ISSUES=0
+WARNINGS=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -v|--verbose)
+            VERBOSE=1
+            shift
+            ;;
+        --fix)
+            FIX=1
+            shift
+            ;;
+        --json)
+            JSON=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+check_pass() {
+    [ "$JSON" != "1" ] && echo "[OK]    $1"
+}
+
+check_warn() {
+    WARNINGS=$((WARNINGS + 1))
+    [ "$JSON" != "1" ] && echo "[WARN]  $1"
+}
+
+check_fail() {
+    ISSUES=$((ISSUES + 1))
+    [ "$JSON" != "1" ] && echo "[FAIL]  $1"
+}
+
+[ "$JSON" != "1" ] && echo "Running mesh health checks..."
+[ "$JSON" != "1" ] && echo ""
+
+# Load mesh config
+if [ ! -f "${CONF_DIR}/mesh.conf" ]; then
+    check_fail "Mesh not initialized"
+    [ "$JSON" = "1" ] && echo '{"status":"error","message":"not initialized"}'
+    exit 1
+fi
+. "${CONF_DIR}/mesh.conf"
+
+# Check 1: Configuration files
+[ "$JSON" != "1" ] && echo "Configuration:"
+if [ -f "${CONF_DIR}/mesh.conf" ]; then
+    check_pass "mesh.conf exists"
+else
+    check_fail "mesh.conf missing"
+fi
+
+if [ -f "${CONF_DIR}/peers.db" ]; then
+    check_pass "peers.db exists"
+else
+    check_fail "peers.db missing"
+fi
+
+# Check 2: Keys
+[ "$JSON" != "1" ] && echo ""
+[ "$JSON" != "1" ] && echo "Keys:"
+if [ -f "${CONF_DIR}/keys/privatekey" ]; then
+    check_pass "Private key exists"
+    # Check permissions using ls (POSIX compliant, works with busybox)
+    KEY_PERMS=$(ls -l "${CONF_DIR}/keys/privatekey" 2>/dev/null | cut -c2-10)
+    if [ "$KEY_PERMS" = "rw-------" ]; then
+        check_pass "Private key permissions correct (600)"
+    else
+        check_warn "Private key permissions should be 600"
+        if [ "$FIX" = "1" ]; then
+            chmod 600 "${CONF_DIR}/keys/privatekey"
+            echo "        Fixed: permissions set to 600"
+        fi
+    fi
+else
+    check_fail "Private key missing"
+fi
+
+if [ -f "${CONF_DIR}/keys/publickey" ]; then
+    check_pass "Public key exists"
+else
+    check_fail "Public key missing"
+fi
+
+# Check 3: WireGuard
+[ "$JSON" != "1" ] && echo ""
+[ "$JSON" != "1" ] && echo "WireGuard:"
+if command -v wg >/dev/null 2>&1; then
+    check_pass "WireGuard tools installed"
+else
+    check_fail "WireGuard tools not found"
+fi
+
+if lsmod 2>/dev/null | grep -q wireguard || [ -d /sys/module/wireguard ]; then
+    check_pass "WireGuard kernel module loaded"
+else
+    check_warn "WireGuard kernel module not detected"
+fi
+
+# Check 4: Interface
+[ "$JSON" != "1" ] && echo ""
+[ "$JSON" != "1" ] && echo "Interface:"
+if ip link show "$MESH_INTERFACE" >/dev/null 2>&1; then
+    check_pass "Interface ${MESH_INTERFACE} exists"
+
+    if ip link show "$MESH_INTERFACE" | grep -q "UP"; then
+        check_pass "Interface is UP"
+    else
+        check_fail "Interface is DOWN"
+        if [ "$FIX" = "1" ]; then
+            wg-quick up "$MESH_INTERFACE" 2>/dev/null && echo "        Fixed: interface started"
+        fi
+    fi
+else
+    check_warn "Interface ${MESH_INTERFACE} not created"
+fi
+
+# Check 5: Peer connectivity
+[ "$JSON" != "1" ] && echo ""
+[ "$JSON" != "1" ] && echo "Peer Connectivity:"
+PEER_COUNT=$(wc -l < "${CONF_DIR}/peers.db" 2>/dev/null | tr -d ' ' || echo 0)
+if [ "$PEER_COUNT" = "0" ]; then
+    check_warn "No peers configured"
+else
+    check_pass "${PEER_COUNT} peer(s) configured"
+
+    if [ "$VERBOSE" = "1" ] && ip link show "$MESH_INTERFACE" >/dev/null 2>&1; then
+        while IFS='|' read -r name type ip endpoint pubkey rest; do
+            PEER_IP="${ip%/*}"
+            if ping -c 1 -W 2 "$PEER_IP" >/dev/null 2>&1; then
+                check_pass "  $name ($PEER_IP) reachable"
+            else
+                check_warn "  $name ($PEER_IP) not responding"
+            fi
+        done < "${CONF_DIR}/peers.db"
+    fi
+fi
+
+# Summary
+[ "$JSON" != "1" ] && echo ""
+[ "$JSON" != "1" ] && echo "========================================"
+
+if [ "$JSON" = "1" ]; then
+    echo "{\"issues\":$ISSUES,\"warnings\":$WARNINGS,\"status\":\"$([ $ISSUES -eq 0 ] && echo 'healthy' || echo 'unhealthy')\"}"
+else
+    if [ $ISSUES -eq 0 ] && [ $WARNINGS -eq 0 ]; then
+        echo "Health Status: HEALTHY"
+    elif [ $ISSUES -eq 0 ]; then
+        echo "Health Status: WARNINGS ($WARNINGS)"
+    else
+        echo "Health Status: ISSUES FOUND ($ISSUES issues, $WARNINGS warnings)"
+    fi
+fi
+
+exit $ISSUES

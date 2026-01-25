@@ -1,0 +1,130 @@
+#!/bin/sh
+# mesh-discovery-details - Show detailed device information
+# Part of WireGuard Mesh Discovery
+
+CONF_DIR="/etc/wg-mesh"
+DEVICES_DB="${CONF_DIR}/discovery/devices.db"
+
+usage() {
+    cat <<EOF
+Usage: mesh-discovery-details <ip-or-mac>
+
+Show detailed information about a discovered device.
+
+Arguments:
+    ip-or-mac       Device IP address or MAC address
+
+Options:
+    --json          Output as JSON
+    -h, --help      Show this help message
+EOF
+}
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+TARGET="$1"
+JSON=0
+shift
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --json)
+            JSON=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [ ! -f "$DEVICES_DB" ]; then
+    echo "No devices discovered."
+    exit 1
+fi
+
+# Find device
+DEVICE_LINE=$(grep -i "$TARGET" "$DEVICES_DB" | head -1)
+
+if [ -z "$DEVICE_LINE" ]; then
+    echo "Device not found: $TARGET"
+    exit 1
+fi
+
+# Parse device info
+IFS='|' read -r ip mac vendor method timestamp <<EOF
+$DEVICE_LINE
+EOF
+
+# Get additional info if nmap is available
+PORTS=""
+HOSTNAME=""
+if command -v nmap >/dev/null 2>&1; then
+    NMAP_OUT=$(nmap -sn "$ip" 2>/dev/null)
+    # Extract hostname (POSIX compliant - no grep -P)
+    HOSTNAME=$(echo "$NMAP_OUT" | grep 'Nmap scan report for' | sed 's/.*Nmap scan report for //' | awk '{print $1}' | head -1)
+fi
+
+# Identify device type
+DEVICE_TYPE="unknown"
+case "$vendor" in
+    *[Hh][Pp]*|*[Hh]ewlett*|*[Cc]anon*|*[Ee]pson*|*[Bb]rother*)
+        DEVICE_TYPE="printer"
+        ;;
+    *[Ss]ynology*|*[Qq][Nn][Aa][Pp]*|*[Nn]etgear*[Rr]eady*)
+        DEVICE_TYPE="nas"
+        ;;
+    *[Hh]ikvision*|*[Dd]ahua*|*[Aa]xis*)
+        DEVICE_TYPE="camera"
+        ;;
+    *[Aa]pple*)
+        DEVICE_TYPE="apple_device"
+        ;;
+esac
+
+# Format timestamp
+if [ -n "$timestamp" ]; then
+    last_seen=$(date -d "@$timestamp" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || date -r "$timestamp" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "$timestamp")
+else
+    last_seen="unknown"
+fi
+
+if [ "$JSON" = "1" ]; then
+    cat <<EOF
+{
+  "ip": "$ip",
+  "mac": "$mac",
+  "vendor": "$vendor",
+  "type": "$DEVICE_TYPE",
+  "hostname": "$HOSTNAME",
+  "method": "$method",
+  "last_seen": "$last_seen"
+}
+EOF
+else
+    echo "Device Details"
+    echo "=============="
+    echo ""
+    echo "IP Address:   $ip"
+    echo "MAC Address:  $mac"
+    echo "Vendor:       $vendor"
+    echo "Type:         $DEVICE_TYPE"
+    [ -n "$HOSTNAME" ] && echo "Hostname:     $HOSTNAME"
+    echo "Discovery:    $method"
+    echo "Last Seen:    $last_seen"
+    echo ""
+
+    # DNS name if available
+    if [ -f "${CONF_DIR}/discovery.conf" ]; then
+        . "${CONF_DIR}/discovery.conf"
+        DNS_NAME=$(echo "$ip" | tr '.' '-')
+        echo "DNS Name:     ${DNS_NAME}${DNS_SUFFIX:-.mesh}"
+    fi
+fi

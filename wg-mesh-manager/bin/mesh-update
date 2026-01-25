@@ -1,0 +1,119 @@
+#!/bin/sh
+# mesh-update - Update a peer's configuration
+# Part of WireGuard Mesh Manager
+
+set -e
+
+CONF_DIR="/etc/wg-mesh"
+
+usage() {
+    cat <<EOF
+Usage: mesh-update <name> [OPTIONS]
+
+Update a peer's configuration.
+
+Arguments:
+    name        Name of the peer to update
+
+Options:
+    --ip IP/MASK          Update mesh IP
+    --endpoint HOST:PORT  Update endpoint
+    --public-key KEY      Update public key
+    --allowed-ips CIDR    Update allowed IPs
+    --description TEXT    Update description
+    -h, --help            Show this help message
+
+Examples:
+    mesh-update laptop --endpoint new-ip.example.com:51820
+    mesh-update server --ip 10.99.0.100/24
+EOF
+}
+
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+PEER_NAME="$1"
+shift
+
+NEW_IP=""
+NEW_ENDPOINT=""
+NEW_PUBKEY=""
+NEW_ALLOWED=""
+NEW_DESC=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --ip)
+            NEW_IP="$2"
+            shift 2
+            ;;
+        --endpoint)
+            NEW_ENDPOINT="$2"
+            shift 2
+            ;;
+        --public-key)
+            NEW_PUBKEY="$2"
+            shift 2
+            ;;
+        --allowed-ips)
+            NEW_ALLOWED="$2"
+            shift 2
+            ;;
+        --description)
+            NEW_DESC="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Check for root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: This command must be run as root"
+    exit 1
+fi
+
+# Check if peer exists
+if ! grep -q "^${PEER_NAME}|" "${CONF_DIR}/peers.db"; then
+    echo "ERROR: Peer '${PEER_NAME}' not found"
+    exit 1
+fi
+
+# Get current values
+OLD_LINE=$(grep "^${PEER_NAME}|" "${CONF_DIR}/peers.db")
+OLD_TYPE=$(echo "$OLD_LINE" | cut -d'|' -f2)
+OLD_IP=$(echo "$OLD_LINE" | cut -d'|' -f3)
+OLD_ENDPOINT=$(echo "$OLD_LINE" | cut -d'|' -f4)
+OLD_PUBKEY=$(echo "$OLD_LINE" | cut -d'|' -f5)
+OLD_ALLOWED=$(echo "$OLD_LINE" | cut -d'|' -f6)
+OLD_KEEPALIVE=$(echo "$OLD_LINE" | cut -d'|' -f7)
+OLD_DESC=$(echo "$OLD_LINE" | cut -d'|' -f8)
+
+# Apply updates
+[ -n "$NEW_IP" ] && OLD_IP="$NEW_IP"
+[ -n "$NEW_ENDPOINT" ] && OLD_ENDPOINT="$NEW_ENDPOINT"
+[ -n "$NEW_PUBKEY" ] && OLD_PUBKEY="$NEW_PUBKEY"
+[ -n "$NEW_ALLOWED" ] && OLD_ALLOWED="$NEW_ALLOWED"
+[ -n "$NEW_DESC" ] && OLD_DESC="$NEW_DESC"
+
+# Build new line
+NEW_LINE="${PEER_NAME}|${OLD_TYPE}|${OLD_IP}|${OLD_ENDPOINT}|${OLD_PUBKEY}|${OLD_ALLOWED}|${OLD_KEEPALIVE}|${OLD_DESC}"
+
+# Update database
+grep -v "^${PEER_NAME}|" "${CONF_DIR}/peers.db" > "${CONF_DIR}/peers.db.tmp"
+echo "$NEW_LINE" >> "${CONF_DIR}/peers.db.tmp"
+mv "${CONF_DIR}/peers.db.tmp" "${CONF_DIR}/peers.db"
+
+echo "Peer '${PEER_NAME}' updated."
+echo ""
+echo "Run 'mesh-generate' to update configurations"
+echo "Run 'mesh-apply-local' to apply changes"
