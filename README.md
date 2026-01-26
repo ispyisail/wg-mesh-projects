@@ -46,7 +46,8 @@ Device discovery across your mesh network.
 
 **One-liner Install (OpenWrt):**
 ```bash
-opkg update && opkg install wget-ssl && wget -O- https://github.com/ispyisail/wg-mesh-projects/raw/master/scripts/install-remote.sh | sh
+opkg update && opkg install wget-ssl && \
+  wget -O- https://github.com/ispyisail/wg-mesh-projects/raw/master/scripts/install-remote.sh | sh
 ```
 
 **Or Manual Install:**
@@ -55,7 +56,8 @@ opkg update && opkg install wget-ssl && wget -O- https://github.com/ispyisail/wg
 opkg update && opkg install wget-ssl
 
 # Download and extract
-wget -O wg-mesh-manager.tar.gz https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+wget -O wg-mesh-manager.tar.gz \
+  https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
 tar -xzf wg-mesh-manager.tar.gz
 cd wg-mesh-manager
 

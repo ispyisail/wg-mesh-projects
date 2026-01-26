@@ -14,10 +14,12 @@
 opkg update && opkg install wget-ssl
 
 # Download latest release
-wget -O wg-mesh-manager.tar.gz https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+wget -O wg-mesh-manager.tar.gz \
+  https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
 
 # Verify checksum (optional)
-wget -O wg-mesh-manager.tar.gz.sha256 https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz.sha256
+wget -O wg-mesh-manager.tar.gz.sha256 \
+  https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz.sha256
 sha256sum -c wg-mesh-manager.tar.gz.sha256
 
 # Extract
