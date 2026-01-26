@@ -65,7 +65,7 @@ WireGuard Mesh Manager
 Version:    $VERSION
 WireGuard:  $WG_VERSION
 
-Project:    https://github.com/YOUR_USERNAME/wg-mesh-projects
+Project:    https://github.com/ispyisail/wg-mesh-projects
 License:    MIT
 
 Commands:

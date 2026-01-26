@@ -17,7 +17,7 @@
 
 ```bash
 # Download
-wget https://github.com/YOUR_USERNAME/wg-mesh-projects/releases/latest/download/wg-mesh-discovery.tar.gz
+wget https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-discovery.tar.gz
 
 # Extract
 tar -xzf wg-mesh-discovery.tar.gz

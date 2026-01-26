@@ -30,7 +30,7 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ```bash
 # Fork and clone
-git clone https://github.com/YOUR_USERNAME/wg-mesh-projects.git
+git clone https://github.com/ispyisail/wg-mesh-projects.git
 cd wg-mesh-projects
 
 # Set up development environment

@@ -450,7 +450,7 @@ mesh-discovery-scan -v
 If these solutions don't resolve your issue:
 
 1. Check the [FAQ](../../docs/FAQ.md)
-2. Search [GitHub Issues](https://github.com/YOUR_USERNAME/wg-mesh-projects/issues)
+2. Search [GitHub Issues](https://github.com/ispyisail/wg-mesh-projects/issues)
 3. Open a new issue with:
    - Output of diagnostic commands above
    - Router model and OpenWrt version

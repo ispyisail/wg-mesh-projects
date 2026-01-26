@@ -99,9 +99,11 @@ show_status() {
         wg show "$MESH_INTERFACE" 2>/dev/null | grep -A3 "^peer:" | while read -r line; do
             case "$line" in
                 peer:*)
-                    PUBKEY=$(echo "$line" | cut -d' ' -f2 | cut -c1-16)
-                    # Find peer name
-                    NAME=$(grep "|${line#peer: }|" "${CONF_DIR}/peers.db" 2>/dev/null | cut -d'|' -f1 || echo "unknown")
+                    PUBKEY_FULL="${line#peer: }"
+                    PUBKEY=$(echo "$PUBKEY_FULL" | cut -c1-16)
+                    # Find peer name (use grep -F for fixed string, pubkeys contain +/)
+                    NAME=$(grep -F "|${PUBKEY_FULL}|" "${CONF_DIR}/peers.db" 2>/dev/null | cut -d'|' -f1 || echo "unknown")
+                    [ -z "$NAME" ] && NAME="unknown"
                     printf "  %-20s " "$NAME"
                     ;;
                 *handshake*)

@@ -11,8 +11,19 @@ Get your WireGuard mesh network running in minutes.
 ## Step 1: Install
 
 ```bash
+# One-liner install (recommended)
+opkg update && opkg install wget-ssl && \
+  wget -O- https://github.com/ispyisail/wg-mesh-projects/raw/master/scripts/install-remote.sh | sh
+```
+
+Or manual install:
+```bash
+# Install wget-ssl first (required for GitHub downloads)
+opkg update && opkg install wget-ssl
+
 # Download package
-wget https://github.com/YOUR_USERNAME/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+wget -O wg-mesh-manager.tar.gz \
+  https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
 
 # Extract
 tar -xzf wg-mesh-manager.tar.gz
@@ -22,30 +33,23 @@ cd wg-mesh-manager
 ./install.sh
 ```
 
-## Step 2: Generate Keys
+## Step 2: Initialize Mesh
 
 ```bash
-# Create WireGuard keys
-wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
-
-# Secure the private key
-chmod 600 /etc/wireguard/privatekey
-
-# View your public key (you'll need this)
-cat /etc/wireguard/publickey
-```
-
-## Step 3: Initialize Mesh
-
-```bash
+# Initialize mesh (generates WireGuard keys automatically)
 mesh-init
+
+# Note: Your public key will be displayed. Save it for adding peers.
 ```
 
-## Step 4: Add This Router
+**Note:** Use `mesh-init --force` to reinitialize an existing mesh.
+
+## Step 3: Add Peers
 
 ```bash
-mesh-add myrouter fixed 10.99.0.1/24 YOUR_PUBLIC_IP:51820 \
-    --public-key $(cat /etc/wireguard/publickey)
+# Add another router to your mesh
+mesh-add router2 fixed 10.99.0.2 ROUTER2_PUBLIC_IP:51820 \
+    --public-key <router2-public-key>
 ```
 
 Replace:

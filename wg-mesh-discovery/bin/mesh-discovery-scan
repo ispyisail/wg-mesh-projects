@@ -100,20 +100,31 @@ scan_arp() {
         done
     else
         # Fallback: ping sweep + ARP table (limit concurrency)
-        base="${net%.*}"
-        # Batch pings to avoid overload (50 at a time)
+        # Extract base network from CIDR (e.g., 192.168.1.0/24 -> 192.168.1)
+        base=$(echo "$net" | cut -d'/' -f1 | sed 's/\.[0-9]*$//')
+        # Batch pings to avoid network overload (10 at a time with delay)
         i=1
         while [ $i -le 254 ]; do
             j=0
-            while [ $j -lt 50 ] && [ $((i + j)) -le 254 ]; do
+            while [ $j -lt 10 ] && [ $((i + j)) -le 254 ]; do
                 ping -c 1 -W 1 "${base}.$((i + j))" >/dev/null 2>&1 &
                 j=$((j + 1))
             done
             wait
-            i=$((i + 50))
+            sleep 0.1 2>/dev/null || sleep 1  # Small delay between batches
+            i=$((i + 10))
         done
-        arp -n 2>/dev/null | grep -v incomplete | grep -E '^[0-9]' | while read -r ip type mac rest; do
-            echo "${ip}|${mac}|unknown|arp|$(date +%s)"
+        # Parse ARP table - handle different output formats
+        # Linux format: IP HWtype HWaddress Flags Mask Iface
+        # BSD format: hostname (IP) at MAC on interface
+        arp -an 2>/dev/null | while read -r line; do
+            # Try to extract IP and MAC from various formats
+            ip=$(echo "$line" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
+            mac=$(echo "$line" | grep -oiE '([0-9a-f]{2}:){5}[0-9a-f]{2}' | head -1)
+            # Skip incomplete or missing entries
+            if [ -n "$ip" ] && [ -n "$mac" ] && [ "$mac" != "00:00:00:00:00:00" ]; then
+                echo "${ip}|${mac}|unknown|arp|$(date +%s)"
+            fi
         done
     fi
 }

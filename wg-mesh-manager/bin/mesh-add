@@ -129,11 +129,14 @@ if grep -q "^${PEER_NAME}|" "${CONF_DIR}/peers.db" 2>/dev/null; then
 fi
 
 # Build allowed IPs
+# Extract just the IP address (without CIDR mask)
+PEER_IP_ONLY="${PEER_IP%/*}"
 if [ -z "$ALLOWED_IPS" ]; then
-    # Default: just the peer's IP
-    PEER_ALLOWED="${PEER_IP%/*}/32"
+    # Default: just the peer's IP with /32 (single host)
+    PEER_ALLOWED="${PEER_IP_ONLY}/32"
 else
-    PEER_ALLOWED="${PEER_IP%/*}/32,${ALLOWED_IPS}"
+    # Include peer's IP plus any additional allowed IPs
+    PEER_ALLOWED="${PEER_IP_ONLY}/32,${ALLOWED_IPS}"
 fi
 
 # Add to database

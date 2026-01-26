@@ -238,7 +238,7 @@ Use `mesh-health --json` or `mesh-stats --json` for machine-readable output.
 
 1. Check this FAQ
 2. Read the [Troubleshooting Guide](../wg-mesh-manager/docs/TROUBLESHOOTING.md)
-3. Search existing [GitHub Issues](https://github.com/YOUR_USERNAME/wg-mesh-projects/issues)
+3. Search existing [GitHub Issues](https://github.com/ispyisail/wg-mesh-projects/issues)
 4. Open a new issue with:
    - Output of `mesh-health`
    - Output of `mesh-version`

@@ -14,7 +14,7 @@ Guide for developers contributing to WireGuard Mesh Projects.
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/wg-mesh-projects.git
+git clone https://github.com/ispyisail/wg-mesh-projects.git
 cd wg-mesh-projects
 
 # Set up development environment

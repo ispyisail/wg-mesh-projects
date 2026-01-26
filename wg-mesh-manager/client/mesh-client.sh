@@ -6,6 +6,7 @@ set -e
 
 VERSION="1.0.0"
 CONF_DIR="$HOME/.wg-mesh"
+WG_INTERFACE="wg-mesh"
 
 usage() {
     cat <<EOF
@@ -73,10 +74,10 @@ cmd_status() {
     echo "=================="
     echo ""
 
-    if sudo wg show wg-mesh >/dev/null 2>&1; then
+    if sudo wg show "$WG_INTERFACE" >/dev/null 2>&1; then
         echo "Status: Connected"
         echo ""
-        sudo wg show wg-mesh
+        sudo wg show "$WG_INTERFACE"
     else
         echo "Status: Disconnected"
     fi
