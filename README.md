@@ -44,25 +44,29 @@ Device discovery across your mesh network.
 
 ### Install Core (Required)
 
+**One-liner Install (OpenWrt):**
 ```bash
+opkg update && opkg install wget-ssl && wget -O- https://github.com/ispyisail/wg-mesh-projects/raw/master/scripts/install-remote.sh | sh
+```
+
+**Or Manual Install:**
+```bash
+# Install wget-ssl (required for GitHub downloads on OpenWrt)
+opkg update && opkg install wget-ssl
+
 # Download and extract
-wget https://github.com/YOUR_USERNAME/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+wget -O wg-mesh-manager.tar.gz https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
 tar -xzf wg-mesh-manager.tar.gz
 cd wg-mesh-manager
 
 # Install
 ./install.sh
 
-# Generate WireGuard keys
-wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
-chmod 600 /etc/wireguard/privatekey
-
-# Initialize mesh
+# Initialize mesh (generates keys automatically)
 mesh-init
 
-# Add this router as a peer
-mesh-add server fixed 10.99.0.1/24 YOUR_PUBLIC_IP:51820 \
-    --public-key $(cat /etc/wireguard/publickey)
+# Add peers to your mesh
+mesh-add router2 fixed 10.99.0.2 192.168.1.100:51820 --public-key <peer-public-key>
 
 # Generate and apply configuration
 mesh-generate
@@ -73,11 +77,13 @@ mesh-status
 mesh-health
 ```
 
+**Note:** Use `mesh-init --force` to reinitialize an existing mesh.
+
 ### Add Discovery (Optional)
 
 ```bash
 # Download and extract
-wget https://github.com/YOUR_USERNAME/wg-mesh-projects/releases/latest/download/wg-mesh-discovery.tar.gz
+wget https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-discovery.tar.gz
 tar -xzf wg-mesh-discovery.tar.gz
 cd wg-mesh-discovery
 
@@ -148,7 +154,7 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/wg-mesh-projects.git
+git clone https://github.com/ispyisail/wg-mesh-projects.git
 cd wg-mesh-projects
 
 # Set up development environment
@@ -170,6 +176,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [WireGuard](https://www.wireguard.com/) - Fast, modern VPN
 - [OpenWrt](https://openwrt.org/) - Router firmware platform
 
----
-
-**Note:** Replace `YOUR_USERNAME` with your GitHub username throughout this project.

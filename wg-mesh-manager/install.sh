@@ -16,6 +16,16 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
+# Check for OpenWrt and install dependencies
+if command -v opkg >/dev/null 2>&1; then
+    # Check for wget-ssl (needed for future updates from GitHub)
+    if wget --version 2>&1 | grep -q "BusyBox"; then
+        echo "Installing wget-ssl for GitHub compatibility..."
+        opkg update >/dev/null 2>&1 || true
+        opkg install wget-ssl >/dev/null 2>&1 || echo "  Note: wget-ssl install failed, GitHub downloads may not work"
+    fi
+fi
+
 # Check for WireGuard
 if ! command -v wg >/dev/null 2>&1; then
     echo "WARNING: WireGuard not found. Installing..."

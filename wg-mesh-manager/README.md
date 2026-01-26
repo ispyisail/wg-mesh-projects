@@ -19,10 +19,22 @@ Core mesh networking package for OpenWrt routers.
 
 ## Installation
 
+### One-liner Install (OpenWrt)
+
 ```bash
-# Extract package
-tar -xzf wg-mesh-manager-1.0.0.tar.gz
-cd wg-mesh-manager-1.0.0
+opkg update && opkg install wget-ssl && wget -O- https://github.com/ispyisail/wg-mesh-projects/raw/master/scripts/install-remote.sh | sh
+```
+
+### Manual Install
+
+```bash
+# Install wget-ssl (required for GitHub downloads)
+opkg update && opkg install wget-ssl
+
+# Download and extract
+wget -O wg-mesh-manager.tar.gz https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+tar -xzf wg-mesh-manager.tar.gz
+cd wg-mesh-manager
 
 # Install
 ./install.sh
@@ -34,16 +46,11 @@ mesh-version
 ## Quick Start
 
 ```bash
-# Generate WireGuard keys
-wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
-chmod 600 /etc/wireguard/privatekey
-
-# Initialize mesh
+# Initialize mesh (generates keys automatically)
 mesh-init
 
-# Add this router as a peer
-mesh-add myrouter fixed 10.99.0.1/24 YOUR_PUBLIC_IP:51820 \
-    --public-key $(cat /etc/wireguard/publickey)
+# Add peers to your mesh
+mesh-add router2 fixed 10.99.0.2 192.168.1.100:51820 --public-key <peer-public-key>
 
 # Generate and apply configuration
 mesh-generate
@@ -53,6 +60,8 @@ mesh-apply-local
 mesh-status
 mesh-health
 ```
+
+**Note:** If reinitializing an existing mesh, use `mesh-init --force`
 
 ## Commands
 

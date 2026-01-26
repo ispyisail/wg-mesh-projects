@@ -10,16 +10,19 @@
 ## Quick Install
 
 ```bash
-# Download latest release
-wget https://github.com/YOUR_USERNAME/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+# Install wget-ssl first (busybox wget can't handle GitHub redirects)
+opkg update && opkg install wget-ssl
 
-# Verify checksum
-wget https://github.com/YOUR_USERNAME/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz.sha256
+# Download latest release
+wget -O wg-mesh-manager.tar.gz https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz
+
+# Verify checksum (optional)
+wget -O wg-mesh-manager.tar.gz.sha256 https://github.com/ispyisail/wg-mesh-projects/releases/latest/download/wg-mesh-manager.tar.gz.sha256
 sha256sum -c wg-mesh-manager.tar.gz.sha256
 
 # Extract
 tar -xzf wg-mesh-manager.tar.gz
-cd wg-mesh-manager-*
+cd wg-mesh-manager
 
 # Install
 ./install.sh
