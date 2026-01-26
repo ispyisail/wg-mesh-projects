@@ -77,34 +77,30 @@ mesh-health          # Detailed health check
 
 ### Adding Peers
 
-**Fixed endpoint (server with public IP):**
+**Fixed endpoint (server with public IP or DDNS):**
 ```bash
 mesh-add server1 fixed 10.99.0.1/24 server1.example.com:51820 \
     --public-key "ABC..." \
     --allowed-ips "10.99.0.1/32,192.168.1.0/24"
 ```
 
-**Dynamic endpoint (behind NAT):**
+**DHCP/Dynamic endpoint (behind NAT or mobile):**
 ```bash
-mesh-add laptop1 dynamic 10.99.0.10/24 \
+mesh-add laptop1 dhcp 10.99.0.10/24 dynamic \
     --public-key "DEF..." \
     --persistent-keepalive 25
 ```
 
-**Mobile client:**
-```bash
-mesh-add phone1 mobile 10.99.0.20/24 \
-    --public-key "GHI..."
-```
+**Note:** For DHCP peers, use `dynamic` as the endpoint to indicate the peer will connect to you (no fixed endpoint).
 
 ### Peer Types
 
-| Type | Use Case | Requires Endpoint |
+| Type | Use Case | Endpoint Required |
 |------|----------|-------------------|
-| `fixed` | Servers with static IP/DDNS | Yes |
-| `dynamic` | Devices behind NAT | No |
-| `mobile` | Phones, laptops | No |
-| `router` | Network gateways | Yes |
+| `fixed` | Servers with static IP or DDNS hostname | Yes (IP:port or hostname:port) |
+| `dhcp` | Devices behind NAT, mobile devices, laptops | Yes (use `dynamic` for roaming devices) |
+
+**Tip:** Use `--persistent-keepalive 25` for peers behind NAT to maintain connectivity.
 
 ### Listing Peers
 
@@ -330,12 +326,12 @@ The `192.168.2.0/24` allows traffic to that LAN through the peer.
 
 For peers behind NAT:
 ```bash
-mesh-add nat-peer dynamic 10.99.0.5/24 \
+mesh-add nat-peer dhcp 10.99.0.5/24 dynamic \
     --public-key KEY \
     --persistent-keepalive 25
 ```
 
-The keepalive (25 seconds) maintains NAT mappings.
+The keepalive (25 seconds) maintains NAT mappings. Use `dynamic` as the endpoint for peers that don't have a fixed public IP.
 
 ### Key Rotation
 

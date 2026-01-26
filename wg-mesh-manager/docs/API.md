@@ -80,9 +80,9 @@ mesh-add NAME TYPE IP [ENDPOINT] [OPTIONS]
 | Argument | Description | Required |
 |----------|-------------|----------|
 | `NAME` | Unique peer name | Yes |
-| `TYPE` | Peer type: fixed, dynamic, mobile, router | Yes |
+| `TYPE` | Peer type: fixed, dhcp | Yes |
 | `IP` | Peer's mesh IP (CIDR format) | Yes |
-| `ENDPOINT` | Public endpoint (host:port) | For fixed/router |
+| `ENDPOINT` | Public endpoint (host:port), use `dynamic` for roaming peers | For fixed type |
 
 ### Options
 
@@ -102,14 +102,15 @@ mesh-add server1 fixed 10.99.0.2/24 server1.example.com:51820 \
     --public-key "ABC123..." \
     --allowed-ips "10.99.0.2/32,192.168.1.0/24"
 
-# Dynamic peer (behind NAT)
-mesh-add laptop1 dynamic 10.99.0.10/24 \
+# DHCP peer (behind NAT, no fixed endpoint)
+mesh-add laptop1 dhcp 10.99.0.10/24 dynamic \
     --public-key "DEF456..." \
     --persistent-keepalive 25
 
-# Mobile client
-mesh-add phone mobile 10.99.0.20/24 \
+# Mobile device (use dhcp type with dynamic endpoint)
+mesh-add phone dhcp 10.99.0.20/24 dynamic \
     --public-key "GHI789..." \
+    --persistent-keepalive 25 \
     --description "John's phone"
 ```
 
