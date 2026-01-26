@@ -4,7 +4,8 @@
       "Bash(dir:*)",
       "Bash(find:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial release: WireGuard Mesh Manager v1.0.0\n\nComplete implementation of WireGuard mesh VPN management for OpenWrt routers.\n\nFeatures:\n- Mesh Manager: peer management, config generation, health monitoring\n- Discovery Module: device scanning \\(ARP/NMAP/mDNS\\), DNS integration, web UI\n- Full POSIX/busybox compatibility for OpenWrt deployment\n- Comprehensive documentation and test suite\n\nPOSIX compatibility fixes applied:\n- Replace process substitution with temp files\n- Replace grep -oP \\(PCRE\\) with grep + awk\n- Replace bc calculator with awk\n- Replace non-portable stat with ls -l\n- Fix filter logic and ARP parsing\n- Add proper dependency checks\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
