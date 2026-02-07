@@ -7,6 +7,12 @@ DISCOVERY_CONF="${CONF_DIR}/discovery.conf"
 DEVICES_DB="${CONF_DIR}/discovery/devices.db"
 CACHE_DIR="${CONF_DIR}/discovery/cache"
 
+# Source environment file if present
+SCRIPT_DIR="$(dirname "$0")"
+ENV_FILE="${SCRIPT_DIR}/../../.env"
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+[ -f "/etc/wg-mesh/.env" ] && . "/etc/wg-mesh/.env"
+
 usage() {
     cat <<EOF
 Usage: mesh-discovery-scan [OPTIONS]
@@ -70,7 +76,8 @@ fi
 
 # Detect networks to scan
 if [ -z "$NETWORK" ]; then
-    NETWORKS=$(ip -4 addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}')
+    LOCALHOST="${WG_LOCALHOST_IP:-127.0.0.1}"
+    NETWORKS=$(ip -4 addr show | grep 'inet ' | grep -v "$LOCALHOST" | awk '{print $2}')
 else
     NETWORKS="$NETWORK"
 fi

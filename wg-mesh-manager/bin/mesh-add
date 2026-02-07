@@ -7,6 +7,12 @@ set -e
 CONF_DIR="/etc/wg-mesh"
 LIB_DIR="/usr/share/wg-mesh/lib"
 
+# Source environment file if present
+SCRIPT_DIR="$(dirname "$0")"
+ENV_FILE="${SCRIPT_DIR}/../../.env"
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+[ -f "/etc/wg-mesh/.env" ] && . "/etc/wg-mesh/.env"
+
 # Source libraries
 [ -f "${LIB_DIR}/logging.sh" ] && . "${LIB_DIR}/logging.sh"
 [ -f "${LIB_DIR}/validation.sh" ] && . "${LIB_DIR}/validation.sh"
@@ -51,10 +57,10 @@ PEER_IP="$3"
 PEER_ENDPOINT="$4"
 shift 4
 
-# Default values
+# Default values (can be overridden via .env)
 PUBLIC_KEY=""
 ALLOWED_IPS=""
-KEEPALIVE="25"
+KEEPALIVE="${WG_MESH_DEFAULT_KEEPALIVE:-25}"
 DESCRIPTION=""
 
 # Parse options

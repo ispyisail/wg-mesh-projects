@@ -85,5 +85,5 @@ DISCOVERY_LOG_LEVEL="info"
 # Enable web UI
 WEBUI_ENABLED="false"
 
-# Web UI port
-WEBUI_PORT="8080"
+# Web UI port (can be overridden via .env with WG_DISCOVERY_WEBUI_PORT)
+WEBUI_PORT="${WG_DISCOVERY_WEBUI_PORT:-8080}"

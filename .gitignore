@@ -26,11 +26,13 @@ Thumbs.db
 *.swp
 *~
 
-# Security - never commit keys
+# Security - never commit keys or environment files
 *.key
 *.pem
 privatekey
 publickey
+.env
+.env.local
 
 # Package builds
 wg-mesh-manager/build/
